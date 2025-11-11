@@ -14,11 +14,11 @@ IMAGE_SIZE = (224, 224)
 
 # **CRITICAL**: Update these labels to match the classes your model was trained on.
 CLASS_LABELS = [
-    'Healthy Plant',
-    'Fungal Blight',
-    'Bacterial Spot',
-    'Viral Mosaic',
-    'Rust Pathogen'
+    'Healthy',
+    'Fungi',
+    'Bacteria',
+    'Virus',
+    'pests'
 ]
 
 # --- Model Loading and Caching ---
@@ -174,3 +174,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
