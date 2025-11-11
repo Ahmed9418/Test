@@ -8,7 +8,7 @@ import io
 # --- Configuration ---
 
 # **CRITICAL**: Update this path to your actual saved model file!
-MODEL_PATH = 'best_model(1).keras' 
+MODEL_PATH = 'pathogen_model_final.tflite' 
 IMAGE_SIZE = (224, 224) # Adjust this to the input size your model expects (e.g., (150, 150))
 # **CRITICAL**: Update these labels to match the classes your model was trained on.
 CLASS_LABELS = [
@@ -162,3 +162,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
