@@ -8,7 +8,7 @@ import os
 # --- Configuration ---
 
 # TFLite model file name
-MODEL_PATH = 'App-Interface/pathogen_model_final.tflite'
+MODEL_PATH = 'App-Interface/pathogen_model_EfficientNetB0.tflite'
 # MobileNetV2 standard input size
 IMAGE_SIZE = (224, 224) 
 
@@ -174,4 +174,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
