@@ -4,6 +4,9 @@ from PIL import Image
 import tensorflow as tf
 import time
 import os
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
+
 
 # --- Configuration ---
 
@@ -14,12 +17,13 @@ IMAGE_SIZE = (224, 224)
 
 # **CRITICAL**: Update these labels to match the classes your model was trained on.
 CLASS_LABELS = [
-    'Healthy',
-    'Fungi',
-    'Bacteria',
-    'Virus',
-    'pests'
+    "Bacteria",
+    "Fungi",
+    "Healthy",
+    "Pests",
+    "Virus"
 ]
+
 
 # --- Model Loading and Caching ---
 
@@ -53,26 +57,28 @@ def load_tflite_model():
 
 def preprocess_image(image_data, input_details):
     """
-    Preprocesses the uploaded image to match the format the TFLite model expects.
+    Preprocesses the uploaded image to match what the MobileNetV2
+    TFLite model expects (preprocess_input).
     """
-    # Get the input shape expected by the model
-    input_shape = input_details[0]['shape'] # e.g., (1, 224, 224, 3)
-    
-    # Convert uploaded image to PIL Image object
+
+    # Read model expected shape
+    input_shape = input_details[0]['shape']  # (1, 224, 224, 3)
+
+    # Load image
     img = Image.open(image_data).convert('RGB')
-    
-    # Resize the image to the model's expected input size (index 1 and 2 of shape)
+
+    # Resize to expected shape
     img = img.resize((input_shape[1], input_shape[2]))
-    
-    # Convert to NumPy array
-    img_array = np.array(img, dtype=np.float32) # TFLite often uses float32
-    
-    # Add an extra dimension for the batch size
+
+    # Convert to array
+    img_array = np.array(img, dtype=np.float32)
+
+    # Add batch dimension
     img_array = np.expand_dims(img_array, axis=0)
-    
-    # Normalize pixel values (assuming normalization to [0, 1] for MobileNetV2)
-    img_array = img_array / 255.0
-    
+
+    # ❗ APPLY EXACT SAME PREPROCESSING USED IN TRAINING
+    img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
+
     return img_array
 
 # --- Prediction and Display Logic ---
@@ -174,6 +180,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
