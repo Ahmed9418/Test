@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 from PIL import Image
+from PIL import ImageOps  # Add this import at the top
 import tensorflow as tf
 import time
 import os
@@ -55,30 +56,23 @@ def load_tflite_model():
 
 # --- Preprocessing Function ---
 
+
 def preprocess_image(image_data, input_details):
-    """
-    Preprocesses the uploaded image to match what the MobileNetV2
-    TFLite model expects (preprocess_input).
-    """
-
-    # Read model expected shape
-    input_shape = input_details[0]['shape']  # (1, 224, 224, 3)
-
-    # Load image
+    input_shape = input_details[0]['shape'] 
+    
     img = Image.open(image_data).convert('RGB')
+    
+    # --- NEW CODE START ---
+    # This keeps the aspect ratio by cropping the center instead of squashing
+    img = ImageOps.fit(img, (input_shape[1], input_shape[2]), Image.Resampling.LANCZOS)
+    # --- NEW CODE END ---
 
-    # Resize to expected shape
-    img = img.resize((input_shape[1], input_shape[2]))
-
-    # Convert to array
     img_array = np.array(img, dtype=np.float32)
-
-    # Add batch dimension
     img_array = np.expand_dims(img_array, axis=0)
-
-    # ❗ APPLY EXACT SAME PREPROCESSING USED IN TRAINING
+    
+    # Standard MobileNetV2 preprocessing
     img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
-
+    
     return img_array
 
 # --- Prediction and Display Logic ---
@@ -180,6 +174,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
