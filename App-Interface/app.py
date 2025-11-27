@@ -59,24 +59,30 @@ def load_tflite_model():
 def preprocess_image(image_data, input_details):
     input_shape = input_details[0]['shape'] 
     
+    # 1. Open Image
     img = Image.open(image_data)
     
-    # 1. FIX ROTATION (Crucial for phone photos)
+    # 2. FIX ROTATION (Critical for phone photos)
     img = ImageOps.exif_transpose(img)
     
-    # 2. Ensure RGB
+    # 3. Ensure RGB (removes Alpha channels from PNGs)
     img = img.convert('RGB')
     
-    # 3. Smart Crop (Center Focus)
+    # 4. Smart Resize (Center Crop) - prevents squashing
+    # This grabs the center 224x224 pixels
     img = ImageOps.fit(img, (input_shape[1], input_shape[2]), Image.Resampling.LANCZOS)
 
-    # 4. Convert and Preprocess
+    # 5. Convert to Array
     img_array = np.array(img, dtype=np.float32)
+    
+    # 6. Add Batch Dimension
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
+    
+    # 7. MobileNetV2 Specific Preprocessing (-1 to 1 scaling)
+    # This is manually doing what tf.keras.applications.mobilenet_v2.preprocess_input does
+    img_array = (img_array / 127.5) - 1.0
     
     return img_array
-
 # --- Prediction and Display Logic ---
 
 def predict_and_display(interpreter, processed_image):
@@ -91,7 +97,16 @@ def predict_and_display(interpreter, processed_image):
     with st.spinner('Running Pathogen Analysis...'):
         # Set the tensor
         interpreter.set_tensor(input_details[0]['index'], processed_image)
-        
+
+        # --- ADD THIS DEBUG BLOCK ---
+        st.write("--- DEBUG: What the model actually sees ---")
+    
+    # 1. Reverse the preprocessing (convert -1...1 back to 0...1)
+        debug_image = (processed_image[0] + 1) / 2.0
+    
+    # 2. Display it
+        st.image(debug_image, caption="Model Input View", clamp=True, width=224)
+    # -----------------------------
         # Invoke the model (run prediction)
         interpreter.invoke()
         
@@ -176,6 +191,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
