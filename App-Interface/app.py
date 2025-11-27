@@ -56,21 +56,23 @@ def load_tflite_model():
 
 # --- Preprocessing Function ---
 
-
 def preprocess_image(image_data, input_details):
     input_shape = input_details[0]['shape'] 
     
-    img = Image.open(image_data).convert('RGB')
+    img = Image.open(image_data)
     
-    # --- NEW CODE START ---
-    # This keeps the aspect ratio by cropping the center instead of squashing
+    # 1. FIX ROTATION (Crucial for phone photos)
+    img = ImageOps.exif_transpose(img)
+    
+    # 2. Ensure RGB
+    img = img.convert('RGB')
+    
+    # 3. Smart Crop (Center Focus)
     img = ImageOps.fit(img, (input_shape[1], input_shape[2]), Image.Resampling.LANCZOS)
-    # --- NEW CODE END ---
 
+    # 4. Convert and Preprocess
     img_array = np.array(img, dtype=np.float32)
     img_array = np.expand_dims(img_array, axis=0)
-    
-    # Standard MobileNetV2 preprocessing
     img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
     
     return img_array
@@ -174,6 +176,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
