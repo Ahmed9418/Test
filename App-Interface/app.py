@@ -6,7 +6,7 @@ import io
 
 # --- Configuration ---
 # Update this if your model is in a subfolder, e.g., 'model/pathogen_model.tflite'
-MODEL_PATH = 'pathogen_model_final.tflite' 
+MODEL_PATH = 'App-Interface/pathogen_model_final.tflite' 
 
 CLASS_LABELS = [
     "Bacteria",
