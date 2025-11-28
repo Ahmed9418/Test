@@ -146,9 +146,9 @@ def main():
              probabilities = predict_with_tta(interpreter, image_to_analyze)
              # ... rest of prediction code ...
         
-        # --- PREDICTION ---
-        if st.button("Analyze Plant"):
-            with st.spinner("Running AI Analysis..."):
+        # # --- PREDICTION ---
+        # if st.button("Analyze Plant"):
+        #     with st.spinner("Running AI Analysis..."):
                 # Run the Robust TTA Prediction directly on the uploaded image
                 probabilities = predict_with_tta(interpreter, original_image)
                 
@@ -178,6 +178,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
