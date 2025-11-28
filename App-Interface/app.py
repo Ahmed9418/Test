@@ -118,7 +118,7 @@ def main():
         original_image = Image.open(uploaded_file)
         
         # Display the uploaded image
-        st.image(original_image, caption="Uploaded Image", width=300)
+        st.image(original_image, caption="Uploaded Image", width=800)
         
         # --- PREDICTION ---
         if st.button("Analyze Plant"):
@@ -152,5 +152,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
