@@ -51,8 +51,6 @@ def preprocess_pil_image(pil_img, input_details):
     return img_array
 
 # --- 3. Prediction with TTA ---
-from PIL import Image, ImageOps, ImageEnhance
-
 def predict_with_tta(interpreter, pil_image):
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
@@ -65,23 +63,15 @@ def predict_with_tta(interpreter, pil_image):
     interpreter.invoke()
     predictions.append(interpreter.get_tensor(output_details[0]['index'])[0])
     
-    # Pass 2: Mirrored
+    # Pass 2: Mirrored (Horizontal Flip)
     flipped_img = pil_image.transpose(Image.FLIP_LEFT_RIGHT)
     processed_2 = preprocess_pil_image(flipped_img, input_details)
     interpreter.set_tensor(input_details[0]['index'], processed_2)
     interpreter.invoke()
     predictions.append(interpreter.get_tensor(output_details[0]['index'])[0])
     
-    # --- PASS 3: THE "FLASHLIGHT" (Gamma Correction) ---
-    # drastically brightens dark spots to reveal texture
-    enhancer = ImageEnhance.Brightness(pil_image)
-    bright_img = enhancer.enhance(1.5) # Increase brightness by 50%
-    processed_3 = preprocess_pil_image(bright_img, input_details)
-    interpreter.set_tensor(input_details[0]['index'], processed_3)
-    interpreter.invoke()
-    predictions.append(interpreter.get_tensor(output_details[0]['index'])[0])
-    
     return np.mean(predictions, axis=0)
+
 # --- 4. Main App UI ---
 def main():
     st.set_page_config(page_title="Plant Care AI", page_icon="🌿")
@@ -158,50 +148,17 @@ def main():
             with st.spinner("Analyzing..."):
                 probabilities = predict_with_tta(interpreter, final_image)
                 
-                # Get Top 2 Predictions
-                sorted_indices = np.argsort(probabilities)[::-1]
-                top1_idx = sorted_indices[0]
-                top2_idx = sorted_indices[1]
+                # Results
+                pred_idx = np.argmax(probabilities)
+                confidence = probabilities[pred_idx] * 100
+                label = CLASS_LABELS[pred_idx]
                 
-                top1_label = CLASS_LABELS[top1_idx]
-                top2_label = CLASS_LABELS[top2_idx]
-                top1_prob = probabilities[top1_idx]
-                top2_prob = probabilities[top2_idx]
-                
-                # CHECK FOR CONFUSION
-                # If the gap is small (< 20%) AND the confusion is between Pests & Fungi
-                confusion_threshold = 0.20
-                is_confused = (top1_prob - top2_prob) < confusion_threshold
-                relevant_classes = {"Pests", "Fungi"}
-                
-                if is_confused and {top1_label, top2_label}.issubset(relevant_classes):
-                    st.warning("⚠️ The AI is unsure between **Pests** and **Fungi**.")
-                    st.write("Please check the leaf closely:")
-                    
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        if st.button("It has PHYSICAL HOLES (Missing tissue)"):
-                            st.error(f"🚨 Final Diagnosis: **Pests**")
-                            # Force the chart to show Pests as winner
-                            probabilities[CLASS_LABELS.index("Pests")] = 0.99
-                            st.bar_chart({l: p*100 for l, p in zip(CLASS_LABELS, probabilities)})
-                            
-                    with col_b:
-                        if st.button("It has SPOTS with Halos (Dead tissue)"):
-                            st.error(f"🚨 Final Diagnosis: **Fungi**")
-                            # Force chart to show Fungi
-                            probabilities[CLASS_LABELS.index("Fungi")] = 0.99
-                            st.bar_chart({l: p*100 for l, p in zip(CLASS_LABELS, probabilities)})
-                            
+                if "Healthy" in label:
+                    st.success(f"✅ Prediction: **{label}** ({confidence:.1f}%)")
                 else:
-                    # Standard Output (No confusion)
-                    if "Healthy" in top1_label:
-                        st.success(f"✅ Prediction: **{top1_label}** ({top1_prob*100:.1f}%)")
-                    else:
-                        st.error(f"🚨 Pathogen: **{top1_label}** ({top1_prob*100:.1f}%)")
-                    
-                    st.bar_chart({l: p*100 for l, p in zip(CLASS_LABELS, probabilities)})
+                    st.error(f"🚨 Pathogen: **{label}** ({confidence:.1f}%)")
+                
+                st.bar_chart({l: p*100 for l, p in zip(CLASS_LABELS, probabilities)})
 
 if __name__ == "__main__":
     main()
-
