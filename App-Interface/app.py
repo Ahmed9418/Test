@@ -140,15 +140,12 @@ def main():
         
         # Show user what the model will see
         st.image(image_to_analyze, caption="What the AI sees", width=300)
-        
-        if st.button("Analyze"):
-             # Pass the ZOOMED image to the predictor
-             probabilities = predict_with_tta(interpreter, image_to_analyze)
-             # ... rest of prediction code ...
+    
+         # ... rest of prediction code ...
         
         # # --- PREDICTION ---
-        # if st.button("Analyze Plant"):
-        #     with st.spinner("Running AI Analysis..."):
+        if st.button("Analyze Plant"):
+            with st.spinner("Running AI Analysis..."):
                 # Run the Robust TTA Prediction directly on the uploaded image
                 probabilities = predict_with_tta(interpreter, original_image)
                 
