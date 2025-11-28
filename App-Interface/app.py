@@ -1,12 +1,13 @@
 import streamlit as st
 import numpy as np
 import tensorflow as tf
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageDraw
 import io
+import os
 
 # --- Configuration ---
-# Update this if your model is in a subfolder, e.g., 'model/pathogen_model.tflite'
-MODEL_PATH = 'App-Interface/pathogen_model_final.tflite' 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(current_dir, 'pathogen_model_final.tflite')
 
 CLASS_LABELS = [
     "Bacteria",
@@ -19,166 +20,145 @@ CLASS_LABELS = [
 # --- 1. Model Loading ---
 @st.cache_resource
 def load_tflite_model():
+    if not os.path.exists(MODEL_PATH):
+        st.error(f"❌ Model file not found at: {MODEL_PATH}")
+        return None
     try:
         interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
         interpreter.allocate_tensors()
         return interpreter
     except Exception as e:
-        st.error(f"Error loading model. Make sure '{MODEL_PATH}' is in the same directory.")
-        st.error(str(e))
+        st.error(f"Error loading model: {e}")
         return None
 
 # --- 2. Robust Preprocessing ---
 def preprocess_pil_image(pil_img, input_details):
-    """
-    Preprocesses the image for MobileNetV2:
-    1. Fixes rotation (EXIF)
-    2. Smart Crops to square (ImageOps.fit)
-    3. Scales to [-1, 1]
-    """
-    input_shape = input_details[0]['shape'] # [1, 224, 224, 3]
+    input_shape = input_details[0]['shape'] 
     target_height = input_shape[1]
     target_width = input_shape[2]
 
-    # A. Fix Rotation (Critical for phone photos)
-    img = ImageOps.exif_transpose(pil_img)
+    # Convert to RGB
+    img = pil_img.convert('RGB')
     
-    # B. Ensure RGB (removes Alpha channels)
-    img = img.convert('RGB')
-    
-    # C. Smart Resize (Center Focus) - Prevents squashing
-    img = ImageOps.fit(img, (target_width, target_height), Image.Resampling.LANCZOS)
+    # Resize to 224x224 (Model Input Size)
+    img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
-    # D. Convert to Array & Scale
+    # Convert to Array & Scale to [-1, 1]
     img_array = np.array(img, dtype=np.float32)
     img_array = np.expand_dims(img_array, axis=0)
-    
-    # MobileNetV2 expects inputs in range [-1, 1]
     img_array = (img_array / 127.5) - 1.0
     
     return img_array
 
-# --- 3. Prediction with TTA (Test Time Augmentation) ---
+# --- 3. Prediction with TTA ---
 def predict_with_tta(interpreter, pil_image):
-    """
-    Runs prediction 3 times on the image (Original, Flipped, Zoomed)
-    and averages the results. This fixes 'uncertain' predictions.
-    """
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
     
     predictions = []
     
-    # Pass 1: Original Image
+    # Pass 1: Original
     processed_1 = preprocess_pil_image(pil_image, input_details)
     interpreter.set_tensor(input_details[0]['index'], processed_1)
     interpreter.invoke()
     predictions.append(interpreter.get_tensor(output_details[0]['index'])[0])
     
     # Pass 2: Mirrored (Horizontal Flip)
-    # Plants look the same flipped, but the model might catch features it missed
     flipped_img = pil_image.transpose(Image.FLIP_LEFT_RIGHT)
     processed_2 = preprocess_pil_image(flipped_img, input_details)
     interpreter.set_tensor(input_details[0]['index'], processed_2)
     interpreter.invoke()
     predictions.append(interpreter.get_tensor(output_details[0]['index'])[0])
     
-    # Pass 3: Slight Internal Zoom (1.1x)
-    # Crops 5% from edges to focus tighter
-    width, height = pil_image.size
-    crop_w = int(width * 0.05)
-    crop_h = int(height * 0.05)
-    zoomed_img = pil_image.crop((crop_w, crop_h, width - crop_w, height - crop_h))
-    processed_3 = preprocess_pil_image(zoomed_img, input_details)
-    interpreter.set_tensor(input_details[0]['index'], processed_3)
-    interpreter.invoke()
-    predictions.append(interpreter.get_tensor(output_details[0]['index'])[0])
-    
-    # Average the results
-    avg_prediction = np.mean(predictions, axis=0)
-    return avg_prediction
+    return np.mean(predictions, axis=0)
 
 # --- 4. Main App UI ---
 def main():
     st.set_page_config(page_title="Plant Care AI", page_icon="🌿")
-    
     st.title("🌿 Plant Pathogen Identifier")
-    st.markdown("Upload a photo of a plant leaf to detect diseases.")
     
-    # Load Model
     interpreter = load_tflite_model()
-    if interpreter is None:
-        return
+    if interpreter is None: return
 
-    # File Uploader
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("Upload Plant Photo", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
-        # Load basic image
+        # Load and Fix Rotation immediately
         original_image = Image.open(uploaded_file)
+        original_image = ImageOps.exif_transpose(original_image)
         
-        # Display the uploaded image
-        st.image(original_image, caption="Uploaded Image", use_column_width=True)
-        # --- ZOOM TOOL (Essential for Whole Plant photos) ---
-        st.write("### 🔍 Frame the Leaf")
-        st.info("If you uploaded a photo of a whole plant, use this slider to Zoom In on the specific sick leaf.")
+        # --- TARGETING TOOL ---
+        st.markdown("### 🎯 Step 1: Target the Disease")
+        st.info("Use the controls to place the RED BOX over the sickest leaf.")
         
-        # Zoom Slider
-        zoom_level = st.slider("Zoom Level", min_value=1.0, max_value=4.0, value=1.0, step=0.1)
+        # 1. Controls
+        col_controls_1, col_controls_2 = st.columns(2)
+        with col_controls_1:
+            zoom = st.slider("🔍 Zoom", 1.0, 5.0, 1.0, 0.1)
         
-        # Calculate Crop
-        width, height = original_image.size
-        new_width = int(width / zoom_level)
-        new_height = int(height / zoom_level)
-        left = (width - new_width) / 2
-        top = (height - new_height) / 2
-        right = (width + new_width) / 2
-        bottom = (height + new_height) / 2
+        # Calculate Box Size (Force Square Crop)
+        img_w, img_h = original_image.size
+        min_dim = min(img_w, img_h)
+        box_size = int(min_dim / zoom)
         
-        # Create the "Close-up" the model needs
-        image_to_analyze = original_image.crop((left, top, right, bottom))
+        # Calculate Max Offsets
+        max_x = img_w - box_size
+        max_y = img_h - box_size
         
-        # Show user what the model will see
-        st.image(image_to_analyze, caption="What the AI sees", width=300)
-    
-         # ... rest of prediction code ...
+        with col_controls_2:
+            # Use percentages for sliders to make them responsive
+            x_pct = st.slider("↔️ Move Left/Right", 0, 100, 50)
+            y_pct = st.slider("↕️ Move Up/Down", 0, 100, 50)
+            
+        # Convert % to pixels
+        x_offset = int((x_pct / 100) * max_x)
+        y_offset = int((y_pct / 100) * max_y)
         
-        # # --- PREDICTION ---
-        if st.button("Analyze Plant"):
-            with st.spinner("Running AI Analysis..."):
-                # Run the Robust TTA Prediction directly on the uploaded image
-                probabilities = predict_with_tta(interpreter, original_image)
+        # Define Crop Box
+        left = x_offset
+        top = y_offset
+        right = x_offset + box_size
+        bottom = y_offset + box_size
+        
+        # Perform Crop
+        final_image = original_image.crop((left, top, right, bottom))
+        
+        # --- VISUALIZATION ---
+        # Draw Red Box on a Copy of Original
+        preview_img = original_image.copy()
+        draw = ImageDraw.Draw(preview_img)
+        draw.rectangle([left, top, right, bottom], outline="red", width=int(min_dim*0.02))
+        
+        # Display Side-by-Side
+        col1, col2 = st.columns(2)
+        with col1:
+            st.caption("Full Image (Red Box = Analysis Area)")
+            st.image(preview_img, use_column_width=True)
+        with col2:
+            st.caption("What the AI Sees (Must show disease!)")
+            st.image(final_image, use_column_width=True)
+            
+        # Warning if resolution is too low
+        if box_size < 224:
+            st.warning("⚠️ Warning: You zoomed in too much! The image is blurry. The AI might struggle.")
+
+        # --- ANALYZE ---
+        st.markdown("---")
+        if st.button("Analyze Target Area", type="primary"):
+            with st.spinner("Analyzing..."):
+                probabilities = predict_with_tta(interpreter, final_image)
                 
-                # Get Top Prediction
-                predicted_index = np.argmax(probabilities)
-                confidence = probabilities[predicted_index] * 100
-                predicted_label = CLASS_LABELS[predicted_index]
+                # Results
+                pred_idx = np.argmax(probabilities)
+                confidence = probabilities[pred_idx] * 100
+                label = CLASS_LABELS[pred_idx]
                 
-                # --- DISPLAY RESULTS ---
-                st.markdown("---")
-                st.subheader("Results")
-                
-                if "Healthy" in predicted_label:
-                    st.balloons()
-                    st.success(f"✅ Prediction: **{predicted_label}**")
-                    st.write(f"Confidence: **{confidence:.2f}%**")
-                    st.markdown("Your plant looks healthy! Keep up the good work.")
+                if "Healthy" in label:
+                    st.success(f"✅ Prediction: **{label}** ({confidence:.1f}%)")
                 else:
-                    st.error(f"🚨 Pathogen Detected: **{predicted_label}**")
-                    st.write(f"Confidence: **{confidence:.2f}%**")
-                    st.warning("Immediate action may be required. Isolate this plant.")
+                    st.error(f"🚨 Pathogen: **{label}** ({confidence:.1f}%)")
                 
-                # Detailed Chart
-                st.markdown("#### Confidence Breakdown")
-                chart_data = {label: prob * 100 for label, prob in zip(CLASS_LABELS, probabilities)}
-                st.bar_chart(chart_data)
+                st.bar_chart({l: p*100 for l, p in zip(CLASS_LABELS, probabilities)})
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
