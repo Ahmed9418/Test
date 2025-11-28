@@ -189,49 +189,10 @@ def main():
             st.error(f"An error occurred during processing: {e}")
             st.warning("Please ensure the uploaded file is a valid image.")
 
-    # ... (setup code) ...
-
-    if uploaded_file is not None:
-        # 1. Open the image
-        image = Image.open(uploaded_file)
-        
-        # --- NEW: ZOOM SLIDER ---
-        st.write("### 🔍 Adjust View")
-        st.info("💡 Use the slider to ZOOM IN until the disease fills the frame!")
-        
-        zoom_level = st.slider("Zoom Level", min_value=1.0, max_value=3.0, value=1.0, step=0.1)
-        
-        # Apply Zoom (Center Crop)
-        width, height = image.size
-        new_width = int(width / zoom_level)
-        new_height = int(height / zoom_level)
-        
-        # Calculate crop box (center)
-        left = (width - new_width) / 2
-        top = (height - new_height) / 2
-        right = (width + new_width) / 2
-        bottom = (height + new_height) / 2
-        
-        # Crop the image
-        zoomed_image = image.crop((left, top, right, bottom))
-        
-        # Display the ZOOMED view (This is what the model will process)
-        st.image(zoomed_image, caption='Model View (Zoomed)', use_column_width=True)
-        # ------------------------
-
-        # Button to trigger prediction
-        if st.button("Analyze Plant"):
-            # Save the zoomed image to a buffer to pass to your preprocessor
-            import io
-            img_byte_arr = io.BytesIO()
-            zoomed_image.save(img_byte_arr, format=image.format)
-            
-            # Preprocess & Predict
-            processed_image = preprocess_image(img_byte_arr, input_details)
-            predict_and_display(interpreter, processed_image)
 
 if __name__ == "__main__":
     main()
+
 
 
 
