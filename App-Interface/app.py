@@ -119,6 +119,32 @@ def main():
         
         # Display the uploaded image
         st.image(original_image, caption="Uploaded Image", use_column_width=True)
+        # --- ZOOM TOOL (Essential for Whole Plant photos) ---
+        st.write("### 🔍 Frame the Leaf")
+        st.info("If you uploaded a photo of a whole plant, use this slider to Zoom In on the specific sick leaf.")
+        
+        # Zoom Slider
+        zoom_level = st.slider("Zoom Level", min_value=1.0, max_value=4.0, value=1.0, step=0.1)
+        
+        # Calculate Crop
+        width, height = original_image.size
+        new_width = int(width / zoom_level)
+        new_height = int(height / zoom_level)
+        left = (width - new_width) / 2
+        top = (height - new_height) / 2
+        right = (width + new_width) / 2
+        bottom = (height + new_height) / 2
+        
+        # Create the "Close-up" the model needs
+        image_to_analyze = original_image.crop((left, top, right, bottom))
+        
+        # Show user what the model will see
+        st.image(image_to_analyze, caption="What the AI sees", width=300)
+        
+        if st.button("Analyze"):
+             # Pass the ZOOMED image to the predictor
+             probabilities = predict_with_tta(interpreter, image_to_analyze)
+             # ... rest of prediction code ...
         
         # --- PREDICTION ---
         if st.button("Analyze Plant"):
@@ -152,6 +178,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
