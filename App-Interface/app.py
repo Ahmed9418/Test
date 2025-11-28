@@ -116,29 +116,7 @@ def main():
     if uploaded_file is not None:
         # Load basic image
         original_image = Image.open(uploaded_file)
-        
-        # --- MANUAL ZOOM TOOL ---
-        st.markdown("### 🔍 Step 1: Adjust View")
-        st.info("Use the slider to ZOOM IN until the leaf/disease fills the frame.")
-        
-        zoom_level = st.slider("Zoom Level", min_value=1.0, max_value=3.0, value=1.0, step=0.1)
-        
-        # Apply Manual Zoom
-        width, height = original_image.size
-        new_width = int(width / zoom_level)
-        new_height = int(height / zoom_level)
-        
-        left = (width - new_width) / 2
-        top = (height - new_height) / 2
-        right = (width + new_width) / 2
-        bottom = (height + new_height) / 2
-        
-        # This is the image we will actually analyze
-        final_image_to_analyze = original_image.crop((left, top, right, bottom))
-        
-        # Show what the model will see
-        st.image(final_image_to_analyze, caption="Analysis View", width=300)
-        
+    
         # --- PREDICTION ---
         if st.button("Analyze Plant"):
             with st.spinner("Running AI Analysis..."):
@@ -171,3 +149,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
