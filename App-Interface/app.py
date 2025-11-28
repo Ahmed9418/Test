@@ -116,12 +116,15 @@ def main():
     if uploaded_file is not None:
         # Load basic image
         original_image = Image.open(uploaded_file)
-    
+        
+        # Display the uploaded image
+        st.image(original_image, caption="Uploaded Image", width=300)
+        
         # --- PREDICTION ---
         if st.button("Analyze Plant"):
             with st.spinner("Running AI Analysis..."):
-                # Run the Robust TTA Prediction
-                probabilities = predict_with_tta(interpreter, final_image_to_analyze)
+                # Run the Robust TTA Prediction directly on the uploaded image
+                probabilities = predict_with_tta(interpreter, original_image)
                 
                 # Get Top Prediction
                 predicted_index = np.argmax(probabilities)
@@ -149,4 +152,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
